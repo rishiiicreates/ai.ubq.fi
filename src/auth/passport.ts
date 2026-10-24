@@ -273,11 +273,11 @@ const callback = async (req: Request): Promise<Response> => {
       signal: AbortSignal.timeout(10_000),
     });
     if (response.status >= 400 && response.status < 500) {
-      await response.body?.cancel();
+      await response.body?.cancel().catch(() => {});
       throw new PassportError(401);
     }
     if (!response.ok) {
-      await response.body?.cancel();
+      await response.body?.cancel().catch(() => {});
       throw new PassportError(502);
     }
     const body = await boundedJson(response, 65_536);
