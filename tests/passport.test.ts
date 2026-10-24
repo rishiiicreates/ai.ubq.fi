@@ -245,3 +245,27 @@ test("Passport exchange timeout returns 502 with passport_unavailable and clears
   const cookies = timeoutFailure.headers.getSetCookie();
   assert(cookies.some((value) => value.startsWith(`${STATE_COOKIE}=; Max-Age=0;`)));
 });
+
+test("Passport exchange body read failure returns 502 with passport_unavailable and clears state cookie", async () => {
+  const { state, stateCookie } = await begin();
+  globalThis.fetch = createFetchMock(async (input) => {
+    const url = urlOf(input);
+    if (url === `${ISSUER}/api/auth/sso/exchange`) {
+      const failingStream = new ReadableStream({
+        start(controller) {
+          controller.error(new Error("network error during body read"));
+        },
+      });
+      return new Response(failingStream, { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    throw new Error(`Unexpected fetch: ${url}`);
+  });
+  const bodyFailure = await handler(request(`/auth/callback?state=${state}&code=single-use-code`, "", { headers: { Cookie: stateCookie } }));
+  assert.equal(bodyFailure.status, 502);
+  const payload = await bodyFailure.json();
+  assert.equal(payload.error.code, "passport_unavailable");
+  assert.equal(payload.error.message, "Passport verification is unavailable.");
+  const cookies = bodyFailure.headers.getSetCookie();
+  assert(cookies.some((value) => value.startsWith(`${STATE_COOKIE}=; Max-Age=0;`)));
+});
+

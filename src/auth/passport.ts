@@ -89,12 +89,17 @@ const boundedJson = async (response: Response, maxBytes: number): Promise<unknow
   let total = 0;
   let text = "";
   try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      total += value.byteLength;
-      if (total > maxBytes) throw new PassportError(502);
-      text += decoder.decode(value, { stream: true });
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > maxBytes) throw new PassportError(502);
+        text += decoder.decode(value, { stream: true });
+      }
+    } catch (error) {
+      if (error instanceof PassportError) throw error;
+      throw new PassportError(502);
     }
     return JSON.parse(text + decoder.decode()) as unknown;
   } finally {
